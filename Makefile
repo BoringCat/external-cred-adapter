@@ -9,7 +9,7 @@ ifdef CI_COMMIT_SHORT_SHA
 COMMIT := ${CI_COMMIT_SHORT_SHA}
 else
 # 从Git获取当前提交ID，取前8位
-COMMIT := $(shell git rev-parse HEAD 2>/dev/null || echo "unknown" | head -c8)
+COMMIT := $(shell (git rev-parse HEAD 2>/dev/null || echo "unknown") | head -c8)
 endif
 
 ifdef CI_PROJECT_NAME
