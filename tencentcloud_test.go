@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -30,7 +31,9 @@ func TestTencentCloudCredSuccess(t *testing.T) {
 	defer ts.Close()
 	tencentCloudCamUrl = ts.URL
 	fn := TencentCloudRoleCredential
-	resp, err := fn()
+	ctx, cancel := context.WithTimeout(context.TODO(), timedOut)
+	defer cancel()
+	resp, err := fn(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +70,9 @@ func TestTencentCloudCredFailed(t *testing.T) {
 	defer ts.Close()
 	tencentCloudCamUrl = ts.URL
 	fn := TencentCloudRoleCredential
-	_, err := fn()
+	ctx, cancel := context.WithTimeout(context.TODO(), timedOut)
+	defer cancel()
+	_, err := fn(ctx)
 	if err == nil {
 		t.Fatal("err is nil")
 	}

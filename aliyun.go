@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,40 +17,51 @@ var (
 	aliyunRoleName    string
 )
 
-func getAliyunToken() (string, error) {
+func getAliyunToken(ctx context.Context) (string, error) {
 	req, err := http.NewRequest(http.MethodPut, aliyunMetadataUrl+aliyunTokenPath, nil)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Add("X-aliyun-ecs-metadata-token-ttl-seconds", "10")
-	result, err := http.DefaultClient.Do(req)
+	debugPrintln("[阿里云]", "[获取访问Token]", "请求URL:", req.URL.String())
+	debugPrintln("[阿里云]", "[获取访问Token]", "请求头:", req.Header)
+	result, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return "", err
 	}
+	debugPrintln("[阿里云]", "[获取访问Token]", "响应状态码:", result.Status)
+	debugPrintln("[阿里云]", "[获取访问Token]", "响应头:", result.Header)
 	defer result.Body.Close()
 	data, err := io.ReadAll(result.Body)
+	debugPrintln("[阿里云]", "[获取访问Token]", "响应体:", string(data))
 	if err != nil {
 		return "", err
 	}
 	return string(data), nil
 }
 
-func getAliyunRoleName(token string) (string, error) {
+func getAliyunRoleName(ctx context.Context, token string) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, aliyunMetadataUrl+aliyunRamPath, nil)
 	req.Header.Add("X-aliyun-ecs-metadata-token", token)
-	result, err := http.DefaultClient.Do(req)
+	debugPrintln("[阿里云]", "[获取角色名称]", "请求URL:", req.URL.String())
+	debugPrintln("[阿里云]", "[获取角色名称]", "请求头:", req.Header)
+	result, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return "", err
 	}
+	debugPrintln("[阿里云]", "[获取角色名称]", "响应状态码:", result.Status)
+	debugPrintln("[阿里云]", "[获取角色名称]", "响应头:", result.Header)
 	defer result.Body.Close()
 	data, err := io.ReadAll(result.Body)
+	debugPrintln("[阿里云]", "[获取角色名称]", "响应体:", string(data))
 	if err != nil {
 		return "", err
 	}
 	if result.StatusCode != 200 {
-		return "", fmt.Errorf("获取角色名称返回异常: %s\n\turl: %s\n%s", result.Status, result.Request.URL.String(), string(data))
+		return "", fmt.Errorf("获取角色名称返回异常: %s", result.Status)
 	}
 	for line := range bytes.Lines(data) {
+		debugPrintln("[阿里云]", "[获取角色名称]", "返回值", string(line))
 		return string(line), nil
 	}
 	return "", io.EOF
@@ -64,31 +76,39 @@ type aliyunRoleCredential struct {
 	Code            string
 }
 
-func AliyunRoleCredential() (*externalProcessCredentialResult, error) {
-	token, err := getAliyunToken()
+func AliyunRoleCredential(ctx context.Context) (*externalProcessCredentialResult, error) {
+	token, err := getAliyunToken(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if aliyunRoleName == "" {
 		var err error
-		aliyunRoleName, err = getAliyunRoleName(token)
+		aliyunRoleName, err = getAliyunRoleName(ctx, token)
 		if err != nil {
 			panic(err)
 		}
 	}
 	req, err := http.NewRequest(http.MethodGet, aliyunMetadataUrl+aliyunRamPath+"/security-credentials/"+aliyunRoleName, nil)
 	req.Header.Add("X-aliyun-ecs-metadata-token", token)
-	result, err := http.DefaultClient.Do(req)
+	debugPrintln("[阿里云]", "[获取临时密钥]", "请求URL:", req.URL.String())
+	debugPrintln("[阿里云]", "[获取临时密钥]", "请求头:", req.Header)
+	result, err := http.DefaultClient.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
+	debugPrintln("[阿里云]", "[获取临时密钥]", "响应状态码:", result.Status)
+	debugPrintln("[阿里云]", "[获取临时密钥]", "响应头:", result.Header)
 	defer result.Body.Close()
+	data, err := io.ReadAll(result.Body)
+	if err != nil {
+		return nil, err
+	}
+	debugPrintln("[阿里云]", "[获取临时密钥]", "响应体:", string(data))
 	if result.StatusCode != 200 {
-		body, _ := io.ReadAll(result.Body)
-		return nil, fmt.Errorf("获取临时密钥返回异常: %s\n\turl: %s\n%s", result.Status, result.Request.URL.String(), string(body))
+		return nil, fmt.Errorf("获取临时密钥返回异常: %s", result.Status)
 	}
 	cred := new(aliyunRoleCredential)
-	if err = json.NewDecoder(result.Body).Decode(cred); err != nil {
+	if err = json.Unmarshal(data, cred); err != nil {
 		fmt.Println(err.Error())
 		return nil, err
 	}

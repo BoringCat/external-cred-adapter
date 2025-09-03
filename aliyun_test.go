@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -55,7 +56,9 @@ func TestAliyunCredSuccess(t *testing.T) {
 	defer ts.Close()
 	aliyunMetadataUrl = ts.URL
 	fn := AliyunRoleCredential
-	resp, err := fn()
+	ctx, cancel := context.WithTimeout(context.TODO(), timedOut)
+	defer cancel()
+	resp, err := fn(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +93,9 @@ func TestAliyunCredFailed(t *testing.T) {
 	defer ts.Close()
 	aliyunMetadataUrl = ts.URL
 	fn := AliyunRoleCredential
-	_, err := fn()
+	ctx, cancel := context.WithTimeout(context.TODO(), timedOut)
+	defer cancel()
+	_, err := fn(ctx)
 	if err == nil {
 		t.Fatal("err is nil")
 	}
