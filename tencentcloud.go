@@ -25,6 +25,9 @@ func getTencentCloudRoleName() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if result.StatusCode != 200 {
+		return "", fmt.Errorf("获取角色名称返回异常: %s\n%s", result.Status, string(data))
+	}
 	for line := range bytes.Lines(data) {
 		return string(line), nil
 	}
@@ -54,6 +57,10 @@ func TencentCloudRoleCredential() (*externalProcessCredentialResult, error) {
 		return nil, err
 	}
 	defer result.Body.Close()
+	if result.StatusCode != 200 {
+		body, _ := io.ReadAll(result.Body)
+		return nil, fmt.Errorf("获取临时密钥返回异常: %s\n%s", result.Status, string(body))
+	}
 	cred := new(tencentCloudRoleCredential)
 	if err = json.NewDecoder(result.Body).Decode(cred); err != nil {
 		return nil, err
